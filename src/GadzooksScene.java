@@ -16,7 +16,7 @@ public class GadzooksScene extends GadzookRenderer {
     Vector2 mapSize = new Vector2(8, 8);
 
     //The size of each map square.
-    int mapUnitSize = 64;
+    int mapUnitSize = 80;
 
     //The maximum ray depth per trace.
     int maxRayDepth = 32;
@@ -49,9 +49,6 @@ public class GadzooksScene extends GadzookRenderer {
         graphics.fillRect((int)playerPos.X, (int)playerPos.Y, 8, 8);
         graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(playerPos.X + playerDelta.X * 10), (int)(playerPos.Y + playerDelta.Y * 10));
 
-        //Draw temp ray.
-        graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(vertRay.X), (int)(vertRay.Y));
-
         //Draw walls.
         graphics.setColor(Color.WHITE);
         for (int i=0; i<mapSize.X; i++)
@@ -59,9 +56,15 @@ public class GadzooksScene extends GadzookRenderer {
             for (int j=0; j<mapSize.Y; j++)
             {
                 if (map[j][i] == 0) { continue; }
-                graphics.fillRect(i * mapUnitSize, j * mapUnitSize, mapUnitSize, mapUnitSize);
+                graphics.fillRect(i * mapUnitSize + 4, j * mapUnitSize + 4, mapUnitSize - 4, mapUnitSize - 4);
             }
         }
+
+        //Draw temp ray.
+        graphics.setColor(Color.RED);
+        graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(vertRay.X), (int)(vertRay.Y));
+        graphics.setColor(Color.GREEN);
+        //graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(horRay.X), (int)(horRay.Y));
 
         //Draw current angle.
         graphics.setColor(Color.RED);
@@ -137,8 +140,13 @@ public class GadzooksScene extends GadzookRenderer {
 
         for (int i=0; i<1; i++)
         {
+            ///////////////////////////////////
+            /// HORIZONTAL LINE CALCULATION ///
+            ///////////////////////////////////
+
             //Create a new vector for the ray intersect position.
             Vector2f horIntersect = new Vector2f(0,0);
+            float horDistance = Float.MAX_VALUE;
 
             //Create the depth tracker.
             int depth = 0;
@@ -149,7 +157,7 @@ public class GadzooksScene extends GadzookRenderer {
             if (rayAngle > Math.PI)
             {
                 //Ray facing up. Calculate intersect for upward ray.
-                horIntersect.Y = playerPos.Y / mapUnitSize * mapUnitSize - 0.0001f;
+                horIntersect.Y = (int)(playerPos.Y / mapUnitSize) * mapUnitSize - 0.001f;
                 horIntersect.X = (playerPos.Y - horIntersect.Y) * aTan + playerPos.X;
 
                 //Set the offset steps based on the fact we're facing up.
@@ -159,7 +167,7 @@ public class GadzooksScene extends GadzookRenderer {
             else if (rayAngle < Math.PI && rayAngle != 0)
             {
                 //Ray facing down. Calculate intersect for downward ray.
-                horIntersect.Y = playerPos.Y / mapUnitSize * mapUnitSize + mapUnitSize;
+                horIntersect.Y = (int)(playerPos.Y / mapUnitSize) * mapUnitSize + mapUnitSize;
                 horIntersect.X = (playerPos.Y - horIntersect.Y) * aTan + playerPos.X;
 
                 //Set the offset steps based on the fact we're facing down.
@@ -181,12 +189,13 @@ public class GadzooksScene extends GadzookRenderer {
                 Vector2 mapCoord = new Vector2((int)(horIntersect.X / mapUnitSize), (int)(horIntersect.Y / mapUnitSize));
 
                 //Is the current grid space actually in the world?
-                if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X > 0 && mapCoord.Y > 0)
+                if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X >= 0 && mapCoord.Y >= 0)
                 {
                     //Yes, is it a wall?
                     if (map[mapCoord.Y][mapCoord.X] == 1)
                     {
-                        //Yes.
+                        //Yes. Set distance, then break.
+                        horDistance = RayDistance(playerPos, horIntersect, rayAngle);
                         break;
                     }
                 }
@@ -199,14 +208,13 @@ public class GadzooksScene extends GadzookRenderer {
                 depth++;
             }
 
-            //Set debug.
-            horRay = horIntersect;
-
-            //VERTICAL LINE CALCULATION
-            //START HERE
+            /////////////////////////////////
+            /// VERTICAL LINE CALCULATION ///
+            /////////////////////////////////
 
             //Create a new vector for the ray intersect position.
             Vector2f vertIntersect = new Vector2f(0,0);
+            float vertDistance = Float.MAX_VALUE;
 
             //Reset the depth tracker.
             depth = 0;
@@ -217,7 +225,7 @@ public class GadzooksScene extends GadzookRenderer {
             if (rayAngle > Math.PI/2 && rayAngle < 3*Math.PI/2)
             {
                 //Ray facing left. Calculate intersect for left facing ray.
-                vertIntersect.X = playerPos.X / mapUnitSize * mapUnitSize - 0.0001f;
+                vertIntersect.X = (int)(playerPos.X / mapUnitSize) * mapUnitSize - 0.001f;
                 vertIntersect.Y = (playerPos.X - vertIntersect.X) * nTan + playerPos.Y;
 
                 //Set the offset steps based on the fact we're facing left.
@@ -227,7 +235,7 @@ public class GadzooksScene extends GadzookRenderer {
             else if (rayAngle < Math.PI/2 || rayAngle > 3*Math.PI/2)
             {
                 //Ray facing right. Calculate intersect for right facing ray.
-                vertIntersect.X = playerPos.X / mapUnitSize * mapUnitSize + mapUnitSize;
+                vertIntersect.X = (int)(playerPos.X / mapUnitSize) * mapUnitSize + mapUnitSize;
                 vertIntersect.Y = (playerPos.X - vertIntersect.X) * nTan + playerPos.Y;
 
                 //Set the offset steps based on the fact we're facing right.
@@ -249,12 +257,13 @@ public class GadzooksScene extends GadzookRenderer {
                 Vector2 mapCoord = new Vector2((int)(vertIntersect.X / mapUnitSize), (int)(vertIntersect.Y / mapUnitSize));
 
                 //Is the current grid space actually in the world?
-                if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X > 0 && mapCoord.Y > 0)
+                if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X >= 0 && mapCoord.Y >= 0)
                 {
                     //Yes, is it a wall?
                     if (map[mapCoord.Y][mapCoord.X] == 1)
                     {
-                        //Yes.
+                        //Yes. Set distance, then break.
+                        vertDistance = RayDistance(playerPos, vertIntersect, rayAngle);
                         break;
                     }
                 }
@@ -267,8 +276,20 @@ public class GadzooksScene extends GadzookRenderer {
                 depth++;
             }
 
+            //Figure out the optimal ray to use (one with shortest distance).
+            Vector2f optimalRay = horIntersect;
+            if (vertDistance < horDistance) { optimalRay = vertIntersect; }
+
             //Set debug.
-            vertRay = vertIntersect;
+            vertRay = optimalRay;
         }
+    }
+
+    /**
+     * Uses the pythagorean theorem to calculate distance between a destination and source of a ray.
+     */
+    private float RayDistance(Vector2f start, Vector2f end, float angle)
+    {
+        return (float)Math.sqrt(Math.pow(end.X - start.X, 2) + Math.pow(end.Y - start.Y, 2));
     }
 }
