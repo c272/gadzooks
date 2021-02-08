@@ -6,14 +6,23 @@ public class GadzooksScene extends GadzookRenderer {
     GameArena arena;
 
     //The position of the player.
-    Vector2 playerPos;
-    Rectangle player;
+    Vector2f playerPos;
+
+    //The delta look and look angle of the player.
+    Vector2f playerDelta = new Vector2f(0, 0);
+    float playerAngle = 0;
 
     //The size of the map.
     Vector2 mapSize = new Vector2(8, 8);
 
     //The size of each map square.
     int mapUnitSize = 64;
+
+    //The maximum ray depth per trace.
+    int maxRayDepth = 8;
+
+    //temp
+    Vector2f horRay = new Vector2f(0,0);
 
     //The map array.
     int[][] map = new int[][] {
@@ -27,48 +36,6 @@ public class GadzooksScene extends GadzookRenderer {
         new int[] { 1, 1, 1, 1, 1, 1, 1, 1 },
     };
 
-    //Runs the scene until exit.
-    public void Run(GameArena a)
-    {
-        //Set the arena, add self as renderer.
-        arena = a;
-        arena.addRenderer(this);
-
-        //Initialize the player position.
-        playerPos = new Vector2(100, 100);
-
-        //Add the player to the scene as a little rectangle.
-        player = new Rectangle(playerPos.X, playerPos.Y, 8, 8, Color.CYAN);
-
-        //Keep window open until escape pressed.
-        while (!arena.isKeyPressed(KeyEvent.VK_ESCAPE))
-        {
-            //todo: game loop
-
-            //Detect player movement.
-            DoPlayerMovement();
-
-            //Pause for the refresh rate.
-            arena.pause();
-        }
-    }
-
-    /**
-     * Detects player movement, and updates the position accordingly.
-     */
-    private void DoPlayerMovement() {
-
-        //W, A, S or D keys down?
-        if (arena.isKeyPressed(KeyEvent.VK_W)) { playerPos.Y -= 5; }
-        if (arena.isKeyPressed(KeyEvent.VK_S)) { playerPos.Y += 5; }
-        if (arena.isKeyPressed(KeyEvent.VK_D)) { playerPos.X += 5; }
-        if (arena.isKeyPressed(KeyEvent.VK_A)) { playerPos.X -= 5; }
-
-        //Update preview positions.
-        player.setXPosition(playerPos.X);
-        player.setYPosition(playerPos.Y);
-    }
-
     /**
      * Draws the scene to the screen.
      * @param graphics The graphics instance to draw with.
@@ -78,7 +45,161 @@ public class GadzooksScene extends GadzookRenderer {
 
         //Draw player.
         graphics.setColor(Color.CYAN);
-        graphics.fillRect(playerPos.X, playerPos.Y, 8, 8);
-        
+        graphics.fillRect((int)playerPos.X, (int)playerPos.Y, 8, 8);
+        graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(playerPos.X + playerDelta.X * 10), (int)(playerPos.Y + playerDelta.Y * 10));
+
+        //Draw temp ray.
+        graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(horRay.X), (int)(horRay.Y));
+
+        //Draw walls.
+        graphics.setColor(Color.WHITE);
+        for (int i=0; i<mapSize.X; i++)
+        {
+            for (int j=0; j<mapSize.Y; j++)
+            {
+                if (map[i][j] == 0) { continue; }
+                graphics.fillRect(i * mapUnitSize, j * mapUnitSize, mapUnitSize, mapUnitSize);
+            }
+        }
+
+        //Draw current angle.
+        graphics.setColor(Color.RED);
+        graphics.drawString(String.valueOf(playerAngle), 10, 10);
+    }
+
+    //Runs the scene until exit.
+    public void Run(GameArena a)
+    {
+        //Set the arena, add self as renderer.
+        arena = a;
+        arena.addRenderer(this);
+
+        //Initialize the player position.
+        playerPos = new Vector2f(100, 100);
+
+        //Set the initial delta value.
+        ChangeLookAngle(0);
+
+        //Keep window open until escape pressed.
+        while (!arena.isKeyPressed(KeyEvent.VK_ESCAPE))
+        {
+            //todo: game loop
+
+            //Detect player movement.
+            DoPlayerMovement();
+
+            //Draw rays.
+            DrawRays();
+
+            //Pause for the refresh rate.
+            arena.pause();
+        }
+    }
+
+    /**
+     * Detects player movement, and updates the position accordingly.
+     */
+    private void DoPlayerMovement()
+    {
+        //W, A, S or D keys down?
+        if (arena.isKeyPressed(KeyEvent.VK_D)) { ChangeLookAngle(0.1f); }
+        if (arena.isKeyPressed(KeyEvent.VK_A)) { ChangeLookAngle(-0.1f); }
+        if (arena.isKeyPressed(KeyEvent.VK_W)) { playerPos.X += playerDelta.X; playerPos.Y += playerDelta.Y; }
+        if (arena.isKeyPressed(KeyEvent.VK_S)) { playerPos.X -= playerDelta.X; playerPos.Y -= playerDelta.Y; }
+    }
+
+    /**
+     * Alters the player's look angle by the given amount.
+     */
+    private void ChangeLookAngle(float amt)
+    {
+        //Add amount, adjust to be within bounds of 2Pi.
+        playerAngle += amt;
+        if (playerAngle < 0) { playerAngle += 2*Math.PI; }
+        if (playerAngle > 2*Math.PI) { playerAngle -= 2*Math.PI; }
+
+        //Make sure player angle is never exactly any of the cardinal directions.
+        //...
+
+        //Adjust player look deltas.
+        playerDelta.X = (float)Math.cos(playerAngle) * 2;
+        playerDelta.Y = (float)Math.sin(playerAngle) * 2;
+    }
+
+    /**
+     * Draws the rays out from the player for calculating the screen draw.
+     */
+    private void DrawRays()
+    {
+        //Set the initial ray angle.
+        float rayAngle = playerAngle;
+
+        for (int i=0; i<1; i++)
+        {
+            //Create a new vector for the ray intersect position.
+            Vector2f horIntersect = new Vector2f(0,0);
+
+            //Create the depth tracker.
+            int depth = 0;
+
+            //Calculate the Y of the horizontal grid intersect.
+            float aTan = -1 / (float)Math.tan(rayAngle);
+            Vector2f intersectStep = new Vector2f(0,0);
+            if (rayAngle > Math.PI)
+            {
+                //Ray facing up. Calculate intersect for upward ray.
+                horIntersect.Y = playerPos.Y / mapUnitSize * mapUnitSize - 0.0001f;
+                horIntersect.X = (playerPos.Y - horIntersect.Y) * aTan + playerPos.X;
+
+                //Set the offset steps based on the fact we're facing up.
+                intersectStep.Y = -mapUnitSize;
+                intersectStep.X = -intersectStep.Y * aTan;
+            }
+            else if (rayAngle < Math.PI && rayAngle != 0)
+            {
+                //Ray facing down. Calculate intersect for downward ray.
+                horIntersect.Y = playerPos.Y / mapUnitSize * mapUnitSize + mapUnitSize;
+                horIntersect.X = (playerPos.Y - horIntersect.Y) * aTan + playerPos.X;
+
+                //Set the offset steps based on the fact we're facing down.
+                intersectStep.Y = mapUnitSize;
+                intersectStep.X = -intersectStep.Y * aTan;
+            }
+            else
+            {
+                //Ray must be facing directly right or left, so don't need to check for horizontal intercept.
+                horIntersect.X = playerPos.X;
+                horIntersect.Y = playerPos.Y;
+                depth = maxRayDepth;
+            }
+
+            //Trace until a wall hit (or run out of depth).
+            while (depth < maxRayDepth)
+            {
+                //Get the map coordinate.
+                Vector2 mapCoord = new Vector2((int)(horIntersect.X / mapUnitSize), (int)(horIntersect.Y / mapUnitSize));
+
+                //Is the current grid space actually in the world?
+                if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X > 0 && mapCoord.Y > 0)
+                {
+                    //Yes, is it a wall?
+                    if (map[mapCoord.Y][mapCoord.X] == 1)
+                    {
+                        //Yes.
+                        break;
+                    }
+                }
+
+                //Go to the next intersect.
+                horIntersect.X += intersectStep.X;
+                horIntersect.Y += intersectStep.Y;
+
+                //Keep going.
+                depth++;
+            }
+
+            //Set debug.
+            horRay = horIntersect;
+        }
     }
 }
