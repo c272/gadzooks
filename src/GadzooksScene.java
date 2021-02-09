@@ -1,6 +1,7 @@
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.Vector;
 
 public class GadzooksScene extends GadzookRenderer {
     //The arena the scene is using.
@@ -24,6 +25,9 @@ public class GadzooksScene extends GadzookRenderer {
 
     //The FOV of the "camera".
     int fieldOfView = 90;
+
+    //How many units a player can be away from a wall before they can't move forward anymore.
+    int collisionGap = 20;
 
     //The list of rays cast this frame.
     ArrayList<Raycast> rays = new ArrayList<>();
@@ -71,11 +75,33 @@ public class GadzooksScene extends GadzookRenderer {
      */
     private void DoPlayerMovement()
     {
-        //W, A, S or D keys down?
-        if (arena.isKeyPressed(KeyEvent.VK_D)) { ChangeLookAngle(0.1f); }
-        if (arena.isKeyPressed(KeyEvent.VK_A)) { ChangeLookAngle(-0.1f); }
-        if (arena.isKeyPressed(KeyEvent.VK_W)) { playerPos.X += playerDelta.X; playerPos.Y += playerDelta.Y; }
-        if (arena.isKeyPressed(KeyEvent.VK_S)) { playerPos.X -= playerDelta.X; playerPos.Y -= playerDelta.Y; }
+        //Change the viewing angle based on the A and D keys.
+        if (arena.isKeyPressed(KeyEvent.VK_D)) { ChangeLookAngle(0.05f); }
+        if (arena.isKeyPressed(KeyEvent.VK_A)) { ChangeLookAngle(-0.05f); }
+
+        //Calculate the current collision gap.
+        Vector2 collisionOffset = new Vector2(collisionGap, collisionGap);
+        if (playerDelta.X < 0) { collisionOffset.X = -collisionGap; }
+        if (playerDelta.Y < 0) { collisionOffset.Y = -collisionGap; }
+
+        //Calculate the point in front and behind the player for collision detection.
+        Vector2 playerGridPos = new Vector2((int)(playerPos.X / mapUnitSize), (int)(playerPos.Y / mapUnitSize));
+        Vector2 forwardCheckPos = new Vector2((int)((playerPos.X + collisionOffset.X) / mapUnitSize), (int)((playerPos.Y + collisionOffset.Y) / mapUnitSize));
+        Vector2 backwardCheckPos = new Vector2((int)((playerPos.X - collisionOffset.X) / mapUnitSize), (int)((playerPos.Y - collisionOffset.Y) / mapUnitSize));
+
+        //Try and move the player forward/backward.
+        if (arena.isKeyPressed(KeyEvent.VK_W))
+        {
+            //Can the player move in the X and Y directions forward?
+            if (map[playerGridPos.Y][forwardCheckPos.X] == 0) { playerPos.X += playerDelta.X; }
+            if (map[forwardCheckPos.Y][playerGridPos.X] == 0) { playerPos.Y += playerDelta.Y; }
+        }
+        if (arena.isKeyPressed(KeyEvent.VK_S))
+        {
+            //Can the player move in the X and Y directions backward?
+            if (map[playerGridPos.Y][backwardCheckPos.X] == 0) { playerPos.X -= playerDelta.X; }
+            if (map[backwardCheckPos.Y][playerGridPos.X] == 0) { playerPos.Y -= playerDelta.Y; }
+        }
     }
 
     /**
