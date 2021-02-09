@@ -33,15 +33,15 @@ public class GadzooksScene extends GadzookRenderer {
     ArrayList<Raycast> rays = new ArrayList<>();
 
     //The map array.
-    int[][] map = new int[][] {
-        new int[] { 1, 1, 1, 1, 1, 1, 1, 1 },
-        new int[] { 1, 0, 1, 0, 0, 0, 0, 1 },
-        new int[] { 1, 0, 1, 0, 0, 0, 0, 1 },
-        new int[] { 1, 0, 1, 0, 0, 0, 0, 1 },
-        new int[] { 1, 0, 0, 0, 0, 0, 0, 1 },
-        new int[] { 1, 0, 0, 0, 0, 1, 0, 1 },
-        new int[] { 1, 0, 0, 0, 0, 0, 0, 1 },
-        new int[] { 1, 1, 1, 1, 1, 1, 1, 1 },
+    MapCell[][] map = new MapCell[][] {
+        new MapCell[] { MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall },
+        new MapCell[] { MapCell.Wall, MapCell.Empty, MapCell.Wall, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Wall },
+        new MapCell[] { MapCell.Wall, MapCell.Empty, MapCell.Wall, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Wall },
+        new MapCell[] { MapCell.Wall, MapCell.Empty, MapCell.Wall, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Wall },
+        new MapCell[] { MapCell.Wall, MapCell.Empty, MapCell.Wall, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Wall },
+        new MapCell[] { MapCell.Wall, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Wall, MapCell.Empty, MapCell.Wall },
+        new MapCell[] { MapCell.Wall, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Empty, MapCell.Wall },
+        new MapCell[] { MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall, MapCell.Wall },
     };
 
     //Runs the scene until exit.
@@ -93,14 +93,14 @@ public class GadzooksScene extends GadzookRenderer {
         if (arena.isKeyPressed(KeyEvent.VK_W))
         {
             //Can the player move in the X and Y directions forward?
-            if (map[playerGridPos.Y][forwardCheckPos.X] == 0) { playerPos.X += playerDelta.X; }
-            if (map[forwardCheckPos.Y][playerGridPos.X] == 0) { playerPos.Y += playerDelta.Y; }
+            if (map[playerGridPos.Y][forwardCheckPos.X].getType() == MapCellType.Empty) { playerPos.X += playerDelta.X; }
+            if (map[forwardCheckPos.Y][playerGridPos.X].getType() == MapCellType.Empty) { playerPos.Y += playerDelta.Y; }
         }
         if (arena.isKeyPressed(KeyEvent.VK_S))
         {
             //Can the player move in the X and Y directions backward?
-            if (map[playerGridPos.Y][backwardCheckPos.X] == 0) { playerPos.X -= playerDelta.X; }
-            if (map[backwardCheckPos.Y][playerGridPos.X] == 0) { playerPos.Y -= playerDelta.Y; }
+            if (map[playerGridPos.Y][backwardCheckPos.X].getType() == MapCellType.Empty) { playerPos.X -= playerDelta.X; }
+            if (map[backwardCheckPos.Y][playerGridPos.X].getType() == MapCellType.Empty) { playerPos.Y -= playerDelta.Y; }
         }
     }
 
@@ -140,7 +140,7 @@ public class GadzooksScene extends GadzookRenderer {
         {
             for (int j=0; j<mapSize.Y; j++)
             {
-                if (map[j][i] == 0) { continue; }
+                if (map[j][i].getType() == MapCellType.Empty) { continue; }
                 graphics.fillRect(i * mapUnitSize + 4, j * mapUnitSize + 4, mapUnitSize - 4, mapUnitSize - 4);
             }
         }
@@ -225,159 +225,171 @@ public class GadzooksScene extends GadzookRenderer {
         //Begin drawing rays.
         for (int i=0; i<arena.getArenaWidth(); i++)
         {
-            ///////////////////////////////////
-            /// HORIZONTAL LINE CALCULATION ///
-            ///////////////////////////////////
-
-            //Create a new vector for the ray intersect position.
-            Vector2f horIntersect = new Vector2f(0,0);
-            float horDistance = Float.MAX_VALUE;
-
-            //Create the depth tracker.
-            int depth = 0;
-
-            //Calculate the Y of the horizontal grid intersect.
-            float aTan = -1 / (float)Math.tan(rayAngle);
-            Vector2f intersectStep = new Vector2f(0,0);
-            if (rayAngle > Math.PI)
-            {
-                //Ray facing up. Calculate intersect for upward ray.
-                horIntersect.Y = (int)(playerPos.Y / mapUnitSize) * mapUnitSize - 0.001f;
-                horIntersect.X = (playerPos.Y - horIntersect.Y) * aTan + playerPos.X;
-
-                //Set the offset steps based on the fact we're facing up.
-                intersectStep.Y = -mapUnitSize;
-                intersectStep.X = -intersectStep.Y * aTan;
-            }
-            else if (rayAngle < Math.PI && rayAngle != 0)
-            {
-                //Ray facing down. Calculate intersect for downward ray.
-                horIntersect.Y = (int)(playerPos.Y / mapUnitSize) * mapUnitSize + mapUnitSize;
-                horIntersect.X = (playerPos.Y - horIntersect.Y) * aTan + playerPos.X;
-
-                //Set the offset steps based on the fact we're facing down.
-                intersectStep.Y = mapUnitSize;
-                intersectStep.X = -intersectStep.Y * aTan;
-            }
-            else
-            {
-                //Ray must be facing directly right or left, so don't need to check for horizontal intercept.
-                horIntersect.X = playerPos.X;
-                horIntersect.Y = playerPos.Y;
-                depth = maxRayDepth;
-            }
-
-            //Trace until a wall hit (or run out of depth).
-            while (depth < maxRayDepth)
-            {
-                //Get the map coordinate.
-                Vector2 mapCoord = new Vector2((int)(horIntersect.X / mapUnitSize), (int)(horIntersect.Y / mapUnitSize));
-
-                //Is the current grid space actually in the world?
-                if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X >= 0 && mapCoord.Y >= 0)
-                {
-                    //Yes, is it a wall?
-                    if (map[mapCoord.Y][mapCoord.X] == 1)
-                    {
-                        //Yes. Set distance, then break.
-                        horDistance = RayDistance(playerPos, horIntersect, rayAngle);
-                        break;
-                    }
-                }
-
-                //Go to the next intersect.
-                horIntersect.X += intersectStep.X;
-                horIntersect.Y += intersectStep.Y;
-
-                //Keep going.
-                depth++;
-            }
-
-            /////////////////////////////////
-            /// VERTICAL LINE CALCULATION ///
-            /////////////////////////////////
-
-            //Create a new vector for the ray intersect position.
-            Vector2f vertIntersect = new Vector2f(0,0);
-            float vertDistance = Float.MAX_VALUE;
-
-            //Reset the depth tracker.
-            depth = 0;
-
-            //Calculate the Y of the horizontal grid intersect.
-            float nTan = (float)-Math.tan(rayAngle);
-            intersectStep = new Vector2f(0,0);
-            if (rayAngle > Math.PI/2 && rayAngle < 3*Math.PI/2)
-            {
-                //Ray facing left. Calculate intersect for left facing ray.
-                vertIntersect.X = (int)(playerPos.X / mapUnitSize) * mapUnitSize - 0.001f;
-                vertIntersect.Y = (playerPos.X - vertIntersect.X) * nTan + playerPos.Y;
-
-                //Set the offset steps based on the fact we're facing left.
-                intersectStep.X = -mapUnitSize;
-                intersectStep.Y = -intersectStep.X * nTan;
-            }
-            else if (rayAngle < Math.PI/2 || rayAngle > 3*Math.PI/2)
-            {
-                //Ray facing right. Calculate intersect for right facing ray.
-                vertIntersect.X = (int)(playerPos.X / mapUnitSize) * mapUnitSize + mapUnitSize;
-                vertIntersect.Y = (playerPos.X - vertIntersect.X) * nTan + playerPos.Y;
-
-                //Set the offset steps based on the fact we're facing right.
-                intersectStep.X = mapUnitSize;
-                intersectStep.Y = -intersectStep.X * nTan;
-            }
-            else
-            {
-                //Ray must be facing directly up or down, so don't need to check for horizontal intercept.
-                vertIntersect.X = playerPos.X;
-                vertIntersect.Y = playerPos.Y;
-                depth = maxRayDepth;
-            }
-
-            //Trace until a wall hit (or run out of depth).
-            while (depth < maxRayDepth)
-            {
-                //Get the map coordinate.
-                Vector2 mapCoord = new Vector2((int)(vertIntersect.X / mapUnitSize), (int)(vertIntersect.Y / mapUnitSize));
-
-                //Is the current grid space actually in the world?
-                if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X >= 0 && mapCoord.Y >= 0)
-                {
-                    //Yes, is it a wall?
-                    if (map[mapCoord.Y][mapCoord.X] == 1)
-                    {
-                        //Yes. Set distance, then break.
-                        vertDistance = RayDistance(playerPos, vertIntersect, rayAngle);
-                        break;
-                    }
-                }
-
-                //Go to the next intersect.
-                vertIntersect.X += intersectStep.X;
-                vertIntersect.Y += intersectStep.Y;
-
-                //Keep going.
-                depth++;
-            }
-
-            //Figure out the optimal ray to use (one with shortest distance).
-            Vector2f optimalRay = horIntersect;
-            float optimalDist = horDistance;
-            if (vertDistance < horDistance)
-            {
-                optimalRay = vertIntersect;
-                optimalDist = vertDistance;
-            }
-
-            //Add the generated ray to the list of rays this frame.
-            rays.add(new Raycast(optimalRay, optimalDist, rayAngle, optimalRay.equals(vertIntersect)));
+            //Cast ray, add to list.
+            rays.add(CastRay(playerPos, rayAngle));
 
             //Increment the ray angle.
             rayAngle += Math.toRadians(fieldOfView) / (float)arena.getArenaWidth();
             if (rayAngle > 2*Math.PI) { rayAngle -= 2*Math.PI; }
             if (rayAngle < 0) { rayAngle += 2*Math.PI; }
         }
+    }
+
+    /**
+     * Casts a ray on the map, given a start position and an angle, and returns a raycast hit.
+     * @param start The origin of the ray.
+     * @param rayAngle The world angle that the ray is being fired at.
+     * @return Raycast data for the generated ray.
+     */
+    public Raycast CastRay(Vector2f start, float rayAngle)
+    {
+        ///////////////////////////////////
+        /// HORIZONTAL LINE CALCULATION ///
+        ///////////////////////////////////
+
+        //Create a new vector for the ray intersect position.
+        Vector2f horIntersect = new Vector2f(0,0);
+        float horDistance = Float.MAX_VALUE;
+
+        //Create the depth tracker.
+        int depth = 0;
+
+        //Calculate the Y of the horizontal grid intersect.
+        float aTan = -1 / (float)Math.tan(rayAngle);
+        Vector2f intersectStep = new Vector2f(0,0);
+        if (rayAngle > Math.PI)
+        {
+            //Ray facing up. Calculate intersect for upward ray.
+            horIntersect.Y = (int)(start.Y / mapUnitSize) * mapUnitSize - 0.001f;
+            horIntersect.X = (start.Y - horIntersect.Y) * aTan + start.X;
+
+            //Set the offset steps based on the fact we're facing up.
+            intersectStep.Y = -mapUnitSize;
+            intersectStep.X = -intersectStep.Y * aTan;
+        }
+        else if (rayAngle < Math.PI && rayAngle != 0)
+        {
+            //Ray facing down. Calculate intersect for downward ray.
+            horIntersect.Y = (int)(start.Y / mapUnitSize) * mapUnitSize + mapUnitSize;
+            horIntersect.X = (start.Y - horIntersect.Y) * aTan + start.X;
+
+            //Set the offset steps based on the fact we're facing down.
+            intersectStep.Y = mapUnitSize;
+            intersectStep.X = -intersectStep.Y * aTan;
+        }
+        else
+        {
+            //Ray must be facing directly right or left, so don't need to check for horizontal intercept.
+            horIntersect.X = start.X;
+            horIntersect.Y = start.Y;
+            depth = maxRayDepth;
+        }
+
+        //Trace until a wall hit (or run out of depth).
+        while (depth < maxRayDepth)
+        {
+            //Get the map coordinate.
+            Vector2 mapCoord = new Vector2((int)(horIntersect.X / mapUnitSize), (int)(horIntersect.Y / mapUnitSize));
+
+            //Is the current grid space actually in the world?
+            if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X >= 0 && mapCoord.Y >= 0)
+            {
+                //Yes, is it a wall?
+                if (map[mapCoord.Y][mapCoord.X].getType() == MapCellType.Wall)
+                {
+                    //Yes. Set distance, then break.
+                    horDistance = RayDistance(start, horIntersect, rayAngle);
+                    break;
+                }
+            }
+
+            //Go to the next intersect.
+            horIntersect.X += intersectStep.X;
+            horIntersect.Y += intersectStep.Y;
+
+            //Keep going.
+            depth++;
+        }
+
+        /////////////////////////////////
+        /// VERTICAL LINE CALCULATION ///
+        /////////////////////////////////
+
+        //Create a new vector for the ray intersect position.
+        Vector2f vertIntersect = new Vector2f(0,0);
+        float vertDistance = Float.MAX_VALUE;
+
+        //Reset the depth tracker.
+        depth = 0;
+
+        //Calculate the Y of the horizontal grid intersect.
+        float nTan = (float)-Math.tan(rayAngle);
+        intersectStep = new Vector2f(0,0);
+        if (rayAngle > Math.PI/2 && rayAngle < 3*Math.PI/2)
+        {
+            //Ray facing left. Calculate intersect for left facing ray.
+            vertIntersect.X = (int)(start.X / mapUnitSize) * mapUnitSize - 0.001f;
+            vertIntersect.Y = (start.X - vertIntersect.X) * nTan + start.Y;
+
+            //Set the offset steps based on the fact we're facing left.
+            intersectStep.X = -mapUnitSize;
+            intersectStep.Y = -intersectStep.X * nTan;
+        }
+        else if (rayAngle < Math.PI/2 || rayAngle > 3*Math.PI/2)
+        {
+            //Ray facing right. Calculate intersect for right facing ray.
+            vertIntersect.X = (int)(start.X / mapUnitSize) * mapUnitSize + mapUnitSize;
+            vertIntersect.Y = (start.X - vertIntersect.X) * nTan + start.Y;
+
+            //Set the offset steps based on the fact we're facing right.
+            intersectStep.X = mapUnitSize;
+            intersectStep.Y = -intersectStep.X * nTan;
+        }
+        else
+        {
+            //Ray must be facing directly up or down, so don't need to check for horizontal intercept.
+            vertIntersect.X = start.X;
+            vertIntersect.Y = start.Y;
+            depth = maxRayDepth;
+        }
+
+        //Trace until a wall hit (or run out of depth).
+        while (depth < maxRayDepth)
+        {
+            //Get the map coordinate.
+            Vector2 mapCoord = new Vector2((int)(vertIntersect.X / mapUnitSize), (int)(vertIntersect.Y / mapUnitSize));
+
+            //Is the current grid space actually in the world?
+            if (mapCoord.X < mapSize.X && mapCoord.Y < mapSize.Y && mapCoord.X >= 0 && mapCoord.Y >= 0)
+            {
+                //Yes, is it a wall?
+                if (map[mapCoord.Y][mapCoord.X].getType() == MapCellType.Wall)
+                {
+                    //Yes. Set distance, then break.
+                    vertDistance = RayDistance(start, vertIntersect, rayAngle);
+                    break;
+                }
+            }
+
+            //Go to the next intersect.
+            vertIntersect.X += intersectStep.X;
+            vertIntersect.Y += intersectStep.Y;
+
+            //Keep going.
+            depth++;
+        }
+
+        //Figure out the optimal ray to use (one with shortest distance).
+        Vector2f optimalRay = horIntersect;
+        float optimalDist = horDistance;
+        if (vertDistance < horDistance)
+        {
+            optimalRay = vertIntersect;
+            optimalDist = vertDistance;
+        }
+
+        //Add the generated ray to the list of rays this frame.
+        return new Raycast(optimalRay, optimalDist, rayAngle, optimalRay.equals(vertIntersect));
     }
 
     /**
