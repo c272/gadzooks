@@ -33,7 +33,7 @@ public class Vector2f
     @Override
     public boolean equals(Object obj) {
         if (obj.getClass() != this.getClass()) { return false; }
-        var other = (Vector2)obj;
+        var other = (Vector2f)obj;
         return other.X == X && other.Y == Y;
     }
 }

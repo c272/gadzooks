@@ -13,7 +13,7 @@ public class Game {
     public static void main(String[] args) throws IOException {
 
         //Create a game instance.
-        GameArena arena = new GameArena(800, 600);
+        GameArena arena = new GameArena(1440, 600);
 
         //Set the refresh rate to 60hz.
         GameArena.setRefreshRateHertz(60);

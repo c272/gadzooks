@@ -1,5 +1,6 @@
 import java.awt.*;
 import java.awt.event.KeyEvent;
+import java.util.ArrayList;
 
 public class GadzooksScene extends GadzookRenderer {
     //The arena the scene is using.
@@ -16,14 +17,16 @@ public class GadzooksScene extends GadzookRenderer {
     Vector2 mapSize = new Vector2(8, 8);
 
     //The size of each map square.
-    int mapUnitSize = 80;
+    int mapUnitSize = 64;
 
     //The maximum ray depth per trace.
     int maxRayDepth = 32;
 
-    //temp
-    Vector2f horRay = new Vector2f(0,0);
-    Vector2f vertRay = new Vector2f(0, 0);
+    //The FOV of the "camera".
+    int fieldOfView = 90;
+
+    //The list of rays cast this frame.
+    ArrayList<Raycast> rays = new ArrayList<>();
 
     //The map array.
     int[][] map = new int[][] {
@@ -36,40 +39,6 @@ public class GadzooksScene extends GadzookRenderer {
         new int[] { 1, 0, 0, 0, 0, 0, 0, 1 },
         new int[] { 1, 1, 1, 1, 1, 1, 1, 1 },
     };
-
-    /**
-     * Draws the scene to the screen.
-     * @param graphics The graphics instance to draw with.
-     */
-    @Override
-    public void Draw(Graphics graphics) {
-
-        //Draw player.
-        graphics.setColor(Color.CYAN);
-        graphics.fillRect((int)playerPos.X, (int)playerPos.Y, 8, 8);
-        graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(playerPos.X + playerDelta.X * 10), (int)(playerPos.Y + playerDelta.Y * 10));
-
-        //Draw walls.
-        graphics.setColor(Color.WHITE);
-        for (int i=0; i<mapSize.X; i++)
-        {
-            for (int j=0; j<mapSize.Y; j++)
-            {
-                if (map[j][i] == 0) { continue; }
-                graphics.fillRect(i * mapUnitSize + 4, j * mapUnitSize + 4, mapUnitSize - 4, mapUnitSize - 4);
-            }
-        }
-
-        //Draw temp ray.
-        graphics.setColor(Color.RED);
-        graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(vertRay.X), (int)(vertRay.Y));
-        graphics.setColor(Color.GREEN);
-        //graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(horRay.X), (int)(horRay.Y));
-
-        //Draw current angle.
-        graphics.setColor(Color.RED);
-        graphics.drawString(String.valueOf(playerAngle), 10, 10);
-    }
 
     //Runs the scene until exit.
     public void Run(GameArena a)
@@ -91,9 +60,6 @@ public class GadzooksScene extends GadzookRenderer {
 
             //Detect player movement.
             DoPlayerMovement();
-
-            //Draw rays.
-            DrawRays();
 
             //Pause for the refresh rate.
             arena.pause();
@@ -122,23 +88,116 @@ public class GadzooksScene extends GadzookRenderer {
         if (playerAngle < 0) { playerAngle += 2*Math.PI; }
         if (playerAngle > 2*Math.PI) { playerAngle -= 2*Math.PI; }
 
-        //Make sure player angle is never exactly any of the cardinal directions.
-        //...
-
         //Adjust player look deltas.
         playerDelta.X = (float)Math.cos(playerAngle) * 2;
         playerDelta.Y = (float)Math.sin(playerAngle) * 2;
     }
 
     /**
+     * Draws the scene to the screen.
+     * @param graphics The graphics instance to draw with.
+     */
+    @Override
+    public void Draw(Graphics graphics)
+    {
+        //Cast rays.
+        CastRays();
+
+        //Draw player.
+        graphics.setColor(Color.CYAN);
+        graphics.fillRect((int)playerPos.X, (int)playerPos.Y, 8, 8);
+        graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(playerPos.X + playerDelta.X * 10), (int)(playerPos.Y + playerDelta.Y * 10));
+
+        //Draw walls.
+        graphics.setColor(Color.WHITE);
+        for (int i=0; i<mapSize.X; i++)
+        {
+            for (int j=0; j<mapSize.Y; j++)
+            {
+                if (map[j][i] == 0) { continue; }
+                graphics.fillRect(i * mapUnitSize + 4, j * mapUnitSize + 4, mapUnitSize - 4, mapUnitSize - 4);
+            }
+        }
+
+        //Draw all rays.
+        graphics.setColor(Color.RED);
+        for (int i=0; i<rays.size(); i++) {
+            graphics.drawLine((int) playerPos.X + 4, (int) playerPos.Y + 4, (int) (rays.get(i).Ray.X), (int) (rays.get(i).Ray.Y));
+        }
+        graphics.setColor(Color.GREEN);
+        //graphics.drawLine((int)playerPos.X + 4, (int)playerPos.Y + 4, (int)(horRay.X), (int)(horRay.Y));
+
+        //Draw current angle.
+        graphics.setColor(Color.RED);
+        graphics.drawString(String.valueOf(playerAngle), 10, 10);
+
+        //Draw the casted scene.
+        DrawScene(rays, graphics, new Vector2(640, 0));
+    }
+
+    /**
+     * Draws the scene to the screen, given a list of rays, a graphics manager, and a starting point.
+     */
+    private void DrawScene(ArrayList<Raycast> rays, Graphics graphics, Vector2 start)
+    {
+        //Draw all columns.
+        int col = 0;
+        for (Raycast ray : rays)
+        {
+            //Calculate the difference between the ray angle and the player's view angle.
+            //This corrects the fisheye effect from a non-uniform diagonal ray.
+            float angleDiff = playerAngle - ray.Angle;
+            if (angleDiff < 0) { angleDiff += 2*Math.PI; }
+            if (angleDiff > 2*Math.PI) { angleDiff -= 2*Math.PI; }
+
+            //Calculate the corrected ray distance.
+            float fixedRayDistance = ray.Distance * (float)Math.cos(angleDiff);
+
+            //Calculate the height of the line on the projection.
+            float lineHeight = mapUnitSize * arena.getArenaHeight() / fixedRayDistance;
+            if (lineHeight > arena.getArenaHeight())
+            {
+                //Cap height at screen height.
+                lineHeight = arena.getArenaHeight();
+            }
+
+            //Calculate the offset above the line to center it.
+            float lineOffset = arena.getArenaHeight() / 2f - (lineHeight / 2f);
+
+            //Set the colour based on whether it was a vertical or horizontal hit.
+            if (ray.IsVerticalHit) {
+                graphics.setColor(new Color(230, 0, 0));
+            }
+            else {
+                graphics.setColor(new Color(180, 0, 0));
+            }
+
+            //Draw onto the screen.
+            graphics.drawLine(start.X + col, (int)(start.Y + lineOffset), start.X + col, (int)(start.Y + lineOffset + lineHeight));
+
+            //Increase the column index.
+            col++;
+        }
+    }
+
+    /**
      * Draws the rays out from the player for calculating the screen draw.
      */
-    private void DrawRays()
+    private void CastRays()
     {
+        //Reset the list of rays.
+        rays = new ArrayList<>();
+
         //Set the initial ray angle.
         float rayAngle = playerAngle;
 
-        for (int i=0; i<1; i++)
+        //Start drawing rays at half the FOV back.
+        rayAngle -= Math.toRadians(fieldOfView) / 2f;
+        if (rayAngle < 0) { rayAngle += 2*Math.PI; }
+        if (rayAngle > 2*Math.PI) { rayAngle -= 2*Math.PI; }
+
+        //Begin drawing rays.
+        for (int i=0; i<arena.getArenaWidth(); i++)
         {
             ///////////////////////////////////
             /// HORIZONTAL LINE CALCULATION ///
@@ -278,10 +337,20 @@ public class GadzooksScene extends GadzookRenderer {
 
             //Figure out the optimal ray to use (one with shortest distance).
             Vector2f optimalRay = horIntersect;
-            if (vertDistance < horDistance) { optimalRay = vertIntersect; }
+            float optimalDist = horDistance;
+            if (vertDistance < horDistance)
+            {
+                optimalRay = vertIntersect;
+                optimalDist = vertDistance;
+            }
 
-            //Set debug.
-            vertRay = optimalRay;
+            //Add the generated ray to the list of rays this frame.
+            rays.add(new Raycast(optimalRay, optimalDist, rayAngle, optimalRay.equals(vertIntersect)));
+
+            //Increment the ray angle.
+            rayAngle += Math.toRadians(fieldOfView) / (float)arena.getArenaWidth();
+            if (rayAngle > 2*Math.PI) { rayAngle -= 2*Math.PI; }
+            if (rayAngle < 0) { rayAngle += 2*Math.PI; }
         }
     }
 
