@@ -17,13 +17,13 @@ public class MapCell {
     MapCellType type;
 
     //The texture of this cell.
-    Sprite texture;
+    GadzookTexture texture;
 
     /**
      * Constructor for a standard map cell.
      * Takes a type of cell (cannot be empty), and a texture.
      */
-    public MapCell(MapCellType type_, Sprite tex)
+    public MapCell(MapCellType type_, GadzookTexture tex)
     {
         type = type_;
         texture = tex;
@@ -32,7 +32,7 @@ public class MapCell {
     /**
      * Returns the sprite texture of this cell.
      */
-    public Sprite getTexture() { return texture; }
+    public GadzookTexture getTexture() { return texture; }
 
     /**
      * Returns the type of cell this is.

@@ -1,4 +1,5 @@
 import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.util.UUID;
 
 public abstract class GadzookRenderer {
@@ -18,7 +19,7 @@ public abstract class GadzookRenderer {
      * Called when it is this renderer's turn to draw to the screen.
      * @param graphics The graphics instance to draw with.
      */
-    public abstract void Draw(Graphics graphics);
+    public abstract void Draw(Graphics graphics, BufferedImage image);
 
     /**
      * Returns whether this renderer is the same instance as the one provided.

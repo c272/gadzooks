@@ -218,7 +218,7 @@ public class GameArena extends JPanel implements Runnable, KeyListener, MouseLis
 				//Allow all attached renderers to draw to the screen.
 				for (GadzookRenderer r : renderers)
 				{
-					r.Draw(graphics);
+					r.Draw(graphics, buffer);
 				}
 			}
 					
